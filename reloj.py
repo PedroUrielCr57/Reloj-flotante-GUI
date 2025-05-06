@@ -1,69 +1,118 @@
-from tkinter import Label, Tk
-import time 
+from tkinter import Tk, Label, Canvas
+import time
+import colorsys
+import psutil
+import GPUtil
 
+# Tamaño ventana
+WIDTH = 300
+HEIGHT = 180
 
-#Todas estas son las funciones que sirven para darle las "ordenes y configuraciones" a la ventana flotante 
+# Colores
+BACKGROUND = "gray"  # será transparente
+TEXT_COLOR = "#ffffff"
+FONT = ("Helvetica Neue", 40, "bold")
+DATE_FONT = ("Helvetica Neue", 12)
+TEMP_FONT = ("Helvetica Neue", 11)
 
-ventana = Tk ()    #Esta cosa esa para darle la "accion " de que se genere una ventana 
-ventana.config(bg='gray')  #Esta cosa es para darle la cofiguracion a la ventana 
-ventana.geometry('500x200')  #Con esta cosa damos el tamaño que queremos que tenga la ventana 
-ventana.wm_attributes('-transparentcolor','gray')   #Se supone que lo que hace es de que todos los colores que sean grises lo cambia...
-#a transparente, entonces el gris no se vereia por que lo estariamos cambiando a "transparente"
-ventana.overrideredirect(1)  #Esta cosa lo que hace es que elimina todas las barras de comando como maximizar, cerrar y minimizar 
+# Inicializar ventana
+ventana = Tk()
+ventana.geometry(f"{WIDTH}x{HEIGHT}")
+ventana.overrideredirect(True)
+ventana.config(bg=BACKGROUND)
+ventana.wm_attributes("-transparentcolor", BACKGROUND)
+# ventana.wm_attributes("-topmost", True)  # lo quitamos para que no esté encima
 
-#Acciones:
-#DEF: Es para definir las funciones que queremos que se creen, es como el "public funcion() del PHP"
+# Hora
+time_label = Label(ventana, font=FONT, fg=TEXT_COLOR, bg=BACKGROUND)
+time_label.pack(pady=(10, 0))
 
-def salir(*args):
-    ventana.destroy()
-    ventana.quit()
+# Fecha
+date_label = Label(ventana, font=DATE_FONT, fg=TEXT_COLOR, bg=BACKGROUND)
+date_label.pack()
 
-def obtener_tiempo():
-    #todas estas cosas son variables:
-    hora = time.strftime('%H:%M:%S')    #Este es el metodo que obtiene la hora (hora, minutos y segundos)
-    zona = time.strftime('%Z')      #Esta es la que optiene la zona horaira
-    fecha_formato12 = time.strftime('%A %d %B %Y')    #Este es el metodo que obtiene el dia mes y año 
+# Temperatura CPU/GPU
+temp_label = Label(ventana, font=TEMP_FONT, fg=TEXT_COLOR, bg=BACKGROUND)
+temp_label.pack(pady=(5, 0))
 
-#todas estas cosas son "labels (etiquetas)"
-    texto_hora['text'] = hora 
-    texto_fecha12['text'] = fecha_formato12
-    zona_horaria['text'] = zona 
-    texto_hora.after(1000, obtener_tiempo)
+# Barra RGB
+canvas = Canvas(ventana, width=WIDTH - 40, height=8, bg=BACKGROUND, highlightthickness=0)
+canvas.pack(pady=(10, 0))
+bar = canvas.create_rectangle(0, 0, 0, 8, fill="red", width=0)
 
+# Variables para color RGB
+hue = 0
 
-#Estas son funciones que nois permiten mover la ventana para todos lados. 
+def get_temperatures():
+    cpu_temp = "?"
+    gpu_temp = "?"
 
-def start(event):
+    # CPU
+    try:
+        temps = psutil.sensors_temperatures()
+        for name, entries in temps.items():
+            for entry in entries:
+                if "cpu" in entry.label.lower() or "core" in entry.label.lower():
+                    cpu_temp = f"{entry.current:.0f}°C"
+                    break
+    except:
+        cpu_temp = "N/D"
+
+    # GPU
+    try:
+        gpus = GPUtil.getGPUs()
+        if gpus:
+            gpu_temp = f"{gpus[0].temperature:.0f}°C"
+    except:
+        gpu_temp = "N/D"
+
+    return cpu_temp, gpu_temp
+
+def update_time():
+    global hue
+    now = time.localtime()
+    hour = time.strftime("%I:%M %p", now)
+    date = time.strftime("%d.%m.%Y", now)
+    sec = now.tm_sec
+
+    time_label.config(text=hour)
+    date_label.config(text=date)
+
+    # Temperaturas
+    cpu, gpu = get_temperatures()
+    temp_label.config(text=f"CPU: {cpu} | GPU: {gpu}")
+
+    # RGB barra
+    percent = sec / 60
+    canvas.coords(bar, 0, 0, (WIDTH - 40) * percent, 8)
+    r, g, b = [int(i * 255) for i in colorsys.hsv_to_rgb(hue, 1, 1)]
+    color = f'#{r:02x}{g:02x}{b:02x}'
+    canvas.itemconfig(bar, fill=color)
+    hue = (hue + 0.005) % 1
+
+    ventana.after(1000, update_time)
+
+# Movimiento ventana
+def start_move(event):
     global x, y
     x = event.x
     y = event.y
 
-def stop(event):
+def stop_move(event):
+    global x, y
     x = None
     y = None
 
-def mover(event):
-    global x, y 
+def do_move(event):
     deltax = event.x - x
     deltay = event.y - y
     ventana.geometry(f"+{ventana.winfo_x() + deltax}+{ventana.winfo_y() + deltay}")
-    ventana.update()
 
+ventana.bind("<ButtonPress-1>", start_move)
+ventana.bind("<ButtonRelease-1>", stop_move)
+ventana.bind("<B1-Motion>", do_move)
+ventana.bind("<KeyPress-Escape>", lambda e: ventana.destroy())
 
-#funcion que nos permite controlar los botones 
-ventana.bind("<ButtonPress-1>",start) #Es la que se encarga de dar la respuesta para el boton izquiero 
-ventana.bind("<ButtonRelease-1>",stop) #monitorea la funcion de respuesta de operacion de la liberacion del boton izquierdo
-ventana.bind("<B1-Motion>",mover) #Funcion de respuesta de movimineto del mouse del al monitor 
-ventana.bind("<KeyPress-Escape>", salir) 
-
-texto_hora = Label(ventana, fg= 'white', bg='gray', font= ('Star Jedi Hollow',50, 'bold'), width=10) 
-texto_hora.grid(column=0, row=0, ipadx=1, ipady=1)
-
-texto_fecha12 = Label(ventana, fg = 'white', bg='gray', font = ('Vivaldi',20, 'bold'))
-texto_fecha12.grid(column=0, row=1)
-
-zona_horaria = Label(ventana, fg= 'white', bg='gray', font = ('Lucida Sans',12))
-zona_horaria.grid(column = 0, row=2)
-
-obtener_tiempo()
+# Iniciar
+update_time()
 ventana.mainloop()
