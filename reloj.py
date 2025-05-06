@@ -3,6 +3,7 @@ import time
 import colorsys
 import psutil
 import GPUtil
+from ventana import centrar_ventana
 
 # Tamaño ventana
 WIDTH = 300
@@ -21,6 +22,7 @@ ventana.geometry(f"{WIDTH}x{HEIGHT}")
 ventana.overrideredirect(True)
 ventana.config(bg=BACKGROUND)
 ventana.wm_attributes("-transparentcolor", BACKGROUND)
+centrar_ventana(ventana, WIDTH, HEIGHT)
 # ventana.wm_attributes("-topmost", True)  # lo quitamos para que no esté encima
 
 # Hora
